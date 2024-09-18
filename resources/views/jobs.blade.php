@@ -19,8 +19,9 @@
   </h2>
   <p>
     Filtrar: 
+    <a class="btn btn-info" href="{{ url('/') . '/jobs' }}">Todos</a>
     <a class="btn btn-warning" href="{{ url('/') . '/jobs?status=Pendiente' }}">Pendientes</a>
-    <a class="btn btn-default" href="{{ url('/') . '/jobs?status=Cancelado' }}">Cancelados</a>
+    <a class="btn btn-default" href="{{ url('/') . '/jobs?status=Eliminado' }}">Cancelados</a>
     <a class="btn btn-success" href="{{ url('/') . '/jobs?status=Completado' }}">Completados</a>
   </p>
   <table class="table">
