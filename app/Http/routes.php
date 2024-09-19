@@ -13,10 +13,6 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/arroz', function () {
-    return 'arroz';
-});
-
 Route::get('/', 'PrintingJobsController@print');
 Route::get('/jobs', 'PrintingJobsController@jobs');
 Route::get('/reprint_job/{job_id}', 'PrintingJobsController@reprint_job');

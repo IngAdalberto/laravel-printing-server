@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\Input;
 
 class PrintingJobsController extends Controller
 {
+    public function __construct()
+    {
+        //$this->middleware('cors');
+    }
+
     public function print()
     {
         return (new PrintingJobService())->print_job( Input::get() );

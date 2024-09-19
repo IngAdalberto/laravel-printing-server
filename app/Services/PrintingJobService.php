@@ -7,9 +7,12 @@ use Exception;
 use Illuminate\Support\Facades\Log;
 use Mike42\Escpos\PrintConnectors\NetworkPrintConnector;
 use Mike42\Escpos\Printer;
+use Illuminate\Support\Facades\Input;
 
 class PrintingJobService
 {
+    public $status = 'Completado';
+
     public function print_job($data)
     {
         if (!$this->validate_data($data)) {
@@ -21,19 +24,21 @@ class PrintingJobService
                 );
         }
 
-        $job = $this->store_job( $data );
+        //$job = $this->store_job( $data ); // Genera error 500 si lo descomento.
         
         $message = $this->sent_to_print( $data );
 
-        $json_response = $this->update_job( $job->id, $message);
+        $json_response = $this->get_json_response($message); // This set $this->status
+
+        //$this->update_job( $job->id, $message); This need $this->status
         
-        return $data['callback'] . '(' . $json_response . ')';
+        return $json_response;
     }
 
     public function validate_data($data)
     {
         if ( !isset( $data['callback'] ) ) {
-            return false;
+            //return false;
         }
         
         if ( !isset( $data['printer_ip'] ) ) {
@@ -54,25 +59,22 @@ class PrintingJobService
     public function store_job($data)
     {
         $data['header'] = json_encode($data['header']);
+        
         $data['lines'] = json_encode($data['lines']);
         
         return PrintingJob::create($data);
     }
-
-    public function update_job(int $id, $message)
+    
+    public function get_json_response($message)
     {
-        $printing_job = PrintingJob::find($id);
-        
-        $status = 'Completado';
-
         if( $message != 'ok' )
         {
-            $status = 'Pendiente';
+            $this->status = 'Pendiente';
         }
 
         $json_response = json_encode(
                                 [ 
-                                    'status' => $status,
+                                    'status' => $this->status,
                                     'message' => $message
                                 ]
                             );
@@ -81,16 +83,21 @@ class PrintingJobService
         {
             $json_response = json_encode(
                 [ 
-                    'status' => $status
+                    'status' => $this->status
                 ]
             );
         }
 
-        $printing_job->status = $status;
+        return $json_response;
+    }
+
+    public function update_job(int $id, $message)
+    {
+        $printing_job = PrintingJob::find($id);       
+
+        $printing_job->status = $this->status;
         $printing_job->log = $message;
         $printing_job->save();
-
-        return $json_response;
     }
 
     public function sent_to_print($data)
@@ -113,8 +120,10 @@ class PrintingJobService
             $printer->text( $header->transaction_label . "\n");
             $printer->selectPrintMode(56);
             $printer->text( $header->number_label . "\n");
+            //$printer->text( "Impresion de prueba\n");
             $printer->setJustification(); // Reset
 
+            
             $printer->selectPrintMode(41);
             $printer->text( "Fecha: " . $header->date . "\n");
             $printer->text( "Cliente: " . $header->customer_name . "\n");
@@ -159,7 +168,7 @@ class PrintingJobService
         } catch (Exception $e) {
 
             // Log the message locally OR use a tool like Bugsnag/Flare to log the error
-            Log::debug($e->getMessage());
+            //Log::debug($e->getMessage());
          
             return $e->getMessage();
         }
