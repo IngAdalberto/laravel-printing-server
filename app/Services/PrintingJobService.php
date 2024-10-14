@@ -108,53 +108,17 @@ class PrintingJobService
         $lines = (object)$data['lines'];
 
         try {
-            
             $connector = new NetworkPrintConnector($printer_IP, 9100);
             $printer = new Printer($connector);
-
+            
             // Initialize
             $printer->initialize();
 
-            $printer->selectPrintMode(32);
-            $printer->setJustification( Printer::JUSTIFY_CENTER );
-            $printer->text( $header->transaction_label . "\n");
-            $printer->selectPrintMode(56);
-            $printer->text( $header->number_label . "\n");
-            //$printer->text( "Impresion de prueba\n");
-            $printer->setJustification(); // Reset
-
-            
-            $printer->selectPrintMode(41);
-            $printer->text( "Fecha: " . $header->date . "\n");
-            $printer->text( "Cliente: " . $header->customer_name . "\n");
-            $printer->text( "Atiende: " . $header->seller_label . "\n");
-            $printer->text( "Detalle: " . $header->detail . "\n\n");
-
-            $printer->text( "___________________________\n");
-            $printer->text( " CANT.        ITEM \n");
-
-            $printer->selectPrintMode(49);
-
-            foreach ($lines as $line) {
-
-                $item_name = $line['item'];
-
-                $end = 20;
-                
-                $printer->text( " " . $line['quantity'] . "-" . substr( $item_name, 0, $end) . "\n" );
-
-                $length_pendiente = strlen($item_name) - $end;
-                $start = $end;
-                    
-                while ($length_pendiente > 3) {
-                    $end += 1;   
-
-                    $printer->text( "    " . substr( $item_name, $start, $end) . "\n" );
-
-                    $length_pendiente = $length_pendiente - $start;
-
-                    $start = $end;
-                }
+            // Build format
+            if ( isset($header->empresa) ) {
+                $printer = $this->build_format_invoice( $printer, $header, $lines );
+            }else{
+                $printer = $this->build_format_order( $printer, $header, $lines );
             }
 
             $printer->selectPrintMode(); // Reset
@@ -174,6 +138,98 @@ class PrintingJobService
         }
 
         return 'ok';
+    }
+
+    public function build_format_invoice( $printer, $header, $lines )
+    {
+        $printer->selectPrintMode(32);
+        $printer->setJustification( Printer::JUSTIFY_CENTER );
+        $printer->text( $header->transaction_label . "\n");
+        $printer->selectPrintMode(56);
+        $printer->text( $header->number_label . "\n");
+        //$printer->text( "Impresion de prueba\n");
+        $printer->setJustification(); // Reset
+        
+        $printer->selectPrintMode(41);
+        $printer->text( "Fecha: " . $header->date . "\n");
+        $printer->text( "Cliente: " . $header->customer_name . "\n");
+        $printer->text( "Atiende: " . $header->seller_label . "\n");
+        $printer->text( "Detalle: " . $header->detail . "\n\n");
+
+        $printer->text( "___________________________\n");
+        $printer->text( " CANT.        ITEM \n");
+
+        $printer->selectPrintMode(49);
+
+        foreach ($lines as $line) {
+
+            $item_name = $line['item'];
+
+            $end = 20;
+            
+            $printer->text( " " . $line['quantity'] . "-" . substr( $item_name, 0, $end) . "\n" );
+
+            $length_pendiente = strlen($item_name) - $end;
+            $start = $end;
+                
+            while ($length_pendiente > 3) {
+                $end += 1;   
+
+                $printer->text( "    " . substr( $item_name, $start, $end) . "\n" );
+
+                $length_pendiente = $length_pendiente - $start;
+
+                $start = $end;
+            }
+        }
+
+        return $printer;
+    }
+
+    public function build_format_order( $printer, $header, $lines )
+    {
+        $printer->selectPrintMode(32);
+        $printer->setJustification( Printer::JUSTIFY_CENTER );
+        $printer->text( $header->transaction_label . "\n");
+        $printer->selectPrintMode(56);
+        $printer->text( $header->number_label . "\n");
+        //$printer->text( "Impresion de prueba\n");
+        $printer->setJustification(); // Reset
+        
+        $printer->selectPrintMode(41);
+        $printer->text( "Fecha: " . $header->date . "\n");
+        $printer->text( "Cliente: " . $header->customer_name . "\n");
+        $printer->text( "Atiende: " . $header->seller_label . "\n");
+        $printer->text( "Detalle: " . $header->detail . "\n\n");
+
+        $printer->text( "___________________________\n");
+        $printer->text( " CANT.        ITEM \n");
+
+        $printer->selectPrintMode(49);
+
+        foreach ($lines as $line) {
+
+            $item_name = $line['item'];
+
+            $end = 20;
+            
+            $printer->text( " " . $line['quantity'] . "-" . substr( $item_name, 0, $end) . "\n" );
+
+            $length_pendiente = strlen($item_name) - $end;
+            $start = $end;
+                
+            while ($length_pendiente > 3) {
+                $end += 1;   
+
+                $printer->text( "    " . substr( $item_name, $start, $end) . "\n" );
+
+                $length_pendiente = $length_pendiente - $start;
+
+                $start = $end;
+            }
+        }
+
+        return $printer;
     }
 
     public function get_jobs( $data )
