@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Log;
 use Mike42\Escpos\PrintConnectors\NetworkPrintConnector;
 use Mike42\Escpos\Printer;
 use Illuminate\Support\Facades\Input;
+use Illuminate\Support\Facades\Storage;
+use Mike42\Escpos\EscposImage;
 
 class PrintingJobService
 {
@@ -142,45 +144,146 @@ class PrintingJobService
 
     public function build_format_invoice( $printer, $header, $lines )
     {
-        $printer->selectPrintMode(32);
+        //dd( $header );
+        // Logo
+        /**/
+        $logo = file_get_contents( $header->empresa['url_logo'] );
+        Storage::put('logo.png', $logo);
+        $logo = EscposImage::load( storage_path() . '/app/logo.png', false);
+        $printer -> bitImage($logo, Printer::IMG_DEFAULT);
+
+        // Datos empresa
+        $printer->selectPrintMode(49);
         $printer->setJustification( Printer::JUSTIFY_CENTER );
-        $printer->text( $header->transaction_label . "\n");
-        $printer->selectPrintMode(56);
-        $printer->text( $header->number_label . "\n");
+        $printer->text( $header->empresa['descripcion'] . "\n");
+        $printer->selectPrintMode(41);
+        $printer->text( $header->empresa['descripcion_tipo_documento_identidad'] . ':' . $header->empresa['numero_identificacion'] . '-' . $header->empresa['digito_verificacion'] . "\n");
+        
+        $barrio = '';
+        if ( $header->empresa['barrio'] != '') {
+            $barrio = ', BRR ' .  $header->empresa['barrio'];
+        }
+        $printer->text( $header->empresa['direccion1'] . $barrio . "\n");
+        $printer->text( $header->empresa['descripcion_ciudad'] . "\n");
+        
+        $telefono2 = '';
+        if ( $header->empresa['telefono2'] != '') {
+            $telefono2 = ', ' .  $header->empresa['telefono2'];
+        }
+        $printer->text( 'Teléfono(s): ' . $header->empresa['telefono1'] . $telefono2 . "\n");
+
+        if ( $header->empresa['email'] != '') {
+            $printer->text( 'Email: ' . $header->empresa['email'] . "\n");
+        }
+
+        if ( $header->empresa['pagina_web'] != '') {
+            $printer->text( $header->empresa['pagina_web'] . "\n");
+        }
+
+        // ____________________________________________________________
+
+        $lineas_encabezado = explode('<br>',$header->etiquetas['encabezado']);
+        foreach ($lineas_encabezado as $key => $message) {
+            $printer->text( $message . "\n");
+        }       
+
+        // Datos de la factura y el cliente       
+
+        //$printer->selectPrintMode(32);
+        $printer->text( "\n");
+        $printer->text( $header->transaction_label . ' ' . $header->number_label . "\n");
+        //$printer->selectPrintMode(56);
+        //$printer->text( $header->number_label . "\n");
         //$printer->text( "Impresion de prueba\n");
         $printer->setJustification(); // Reset
         
         $printer->selectPrintMode(41);
         $printer->text( "Fecha: " . $header->date . "\n");
         $printer->text( "Cliente: " . $header->customer_name . "\n");
-        $printer->text( "Atiende: " . $header->seller_label . "\n");
+        $printer->text( $header->cliente_info['descripcion_tipo_documento_identidad'] . ':' . $header->cliente_info['numero_identificacion'] . '-' . $header->cliente_info['digito_verificacion'] . "\n");
+
+        $barrio = '';
+        if ( $header->cliente_info['barrio'] != '') {
+            $barrio = ', BRR ' .  $header->cliente_info['barrio'];
+        }
+        $printer->text( "Dirección: " . $header->cliente_info['direccion1'] . $barrio .  "\n");
+        
+        $telefono2 = '';
+        if ( $header->cliente_info['telefono2'] != '') {
+            $telefono2 = ', ' .  $header->cliente_info['telefono2'];
+        }
+        $printer->text( "Teléfono: " . $header->cliente_info['telefono1'] . $telefono2 . "\n");
+        $printer->text( "Atendido por: " . $header->seller_label . "\n");
         $printer->text( "Detalle: " . $header->detail . "\n\n");
 
-        $printer->text( "___________________________\n");
-        $printer->text( " CANT.        ITEM \n");
+        // Lineas de registros
+        $printer->selectPrintMode(41);
+        $printer->text( "______________________________\n");
+        $printer->text( "   ITEM    Cant/Precio   Total\n");
 
-        $printer->selectPrintMode(49);
-
+        $total_factura = 0;
         foreach ($lines as $line) {
 
             $item_name = $line['item'];
 
-            $end = 20;
+            $end = 10;
             
-            $printer->text( " " . $line['quantity'] . "-" . substr( $item_name, 0, $end) . "\n" );
+            $texto_inicial = '*' . substr( $item_name, 0, $end);
+            if ( strlen($texto_inicial) < $end ) {
+                $caracteres_restantes = $end - strlen($texto_inicial);
+                for ($i=0; $i < $caracteres_restantes; $i++) { 
+                    $texto_inicial .= ' ';
+                }
+            }
+
+            $texto_medio = $line['quantity'] . "/$" . number_format($line['unit_price'],'0',',','.');
+            if ( strlen($texto_medio) < 10 ) {
+                $caracteres_restantes = 10 - strlen($texto_medio);
+                for ($i=0; $i < $caracteres_restantes; $i++) { 
+                    $texto_medio = ' ' . $texto_medio;
+                }
+            }
+
+            $texto_final = "$" . number_format($line['total_amount'],'0',',','.');
+            if ( strlen($texto_final) < 8 ) {
+                $caracteres_restantes = 8 - strlen($texto_final);
+                for ($i=0; $i < $caracteres_restantes; $i++) { 
+                    $texto_final = ' ' . $texto_final;
+                }
+            }
+
+
+            // Draw first line
+            $printer->text(  $texto_inicial . " " . $texto_medio . " " . $texto_final . "\n" );
 
             $length_pendiente = strlen($item_name) - $end;
             $start = $end;
-                
-            while ($length_pendiente > 3) {
-                $end += 1;   
+            $end = 25;
+            //while ($length_pendiente > 3) {
+              //  $end += 1;   
 
-                $printer->text( "    " . substr( $item_name, $start, $end) . "\n" );
+                $printer->text( " " . substr( $item_name, $start, $end) . "\n" );
 
-                $length_pendiente = $length_pendiente - $start;
+                //$length_pendiente = $length_pendiente - $start;
 
-                $start = $end;
-            }
+                //$start = $end;
+            //}
+
+            $total_factura += $line['total_amount'];
+        }
+
+        $printer->text( "______________________________\n");
+        $printer->text( "     Total Factura:    $" . number_format($total_factura,'0',',','.') . "\n" );
+
+        
+        $printer->text( "\n\n Firma del Aceptante:  \n\n\n" );
+
+        $lineas_pie_pagina = explode('<br>',$header->etiquetas['pie_pagina']);
+        
+        $printer->setJustification( Printer::JUSTIFY_CENTER );
+        $printer->selectPrintMode(41);
+        foreach ($lineas_pie_pagina as $key => $message) {
+            $printer->text( $message . "\n");
         }
 
         return $printer;
