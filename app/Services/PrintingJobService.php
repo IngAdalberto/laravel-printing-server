@@ -115,6 +115,9 @@ class PrintingJobService
             
             // Initialize
             $printer->initialize();
+            
+            // The B is for the bell chime, the second digit for the number of requested beeps, and the third for the time between beeps.
+            $printer -> getPrintConnector() -> write(PRINTER::ESC . "B" . chr(3) . chr(2));
 
             // Build format
             if ( isset($header->empresa) ) {
@@ -303,13 +306,17 @@ class PrintingJobService
         $printer->text( "Fecha: " . $header->date . "\n");
         $printer->text( "Cliente: " . $header->customer_name . "\n");
         $printer->text( "Atiende: " . $header->seller_label . "\n");
+        
+        $printer->selectPrintMode(49);
         $printer->text( "Detalle: " . $header->detail . "\n\n");
 
+        $printer->selectPrintMode(41);
         $printer->text( "___________________________\n");
         $printer->text( " CANT.        ITEM \n");
 
         $printer->selectPrintMode(49);
 
+        $total_factura = 0;
         foreach ($lines as $line) {
 
             $item_name = $line['item'];
@@ -320,6 +327,7 @@ class PrintingJobService
 
             $length_pendiente = strlen($item_name) - $end;
             $start = $end;
+            $end = 25;
                 
             while ($length_pendiente > 3) {
                 $end += 1;   
@@ -330,7 +338,11 @@ class PrintingJobService
 
                 $start = $end;
             }
+
+           $total_factura += $line['total_amount'];
         }
+
+        $printer->text( "\n     Total Pedido:    $" . number_format($total_factura,'0',',','.') . "\n" );
 
         return $printer;
     }
